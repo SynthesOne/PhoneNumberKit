@@ -103,26 +103,24 @@ final class ParseManager {
     /// - Returns: An array of valid PhoneNumber objects.
     func parseMultiple(_ numberStrings: [String], withRegion region: String, ignoreType: Bool, shouldReturnFailedEmptyNumbers: Bool = false) -> [PhoneNumber] {
         var hasError = false
+        var results = [PhoneNumber](repeating: PhoneNumber.notPhoneNumber(), count: numberStrings.count) // Temporary array
 
-        var multiParseArray = [PhoneNumber](unsafeUninitializedCapacity: numberStrings.count) { buffer, initializedCount in
-            DispatchQueue.concurrentPerform(iterations: numberStrings.count) { index in
-                let numberString = numberStrings[index]
-                do {
-                    let phoneNumber = try self.parse(numberString, withRegion: region, ignoreType: ignoreType)
-                    buffer.baseAddress!.advanced(by: index).initialize(to: phoneNumber)
-                } catch {
-                    buffer.baseAddress!.advanced(by: index).initialize(to: PhoneNumber.notPhoneNumber())
-                    hasError = true
-                }
+        DispatchQueue.concurrentPerform(iterations: numberStrings.count) { index in
+            let numberString = numberStrings[index]
+            do {
+                let phoneNumber = try self.parse(numberString, withRegion: region, ignoreType: ignoreType)
+                results[index] = phoneNumber // Update the results array
+            } catch {
+                results[index] = PhoneNumber.notPhoneNumber() // Update the results array
+                hasError = true
             }
-            initializedCount = numberStrings.count
         }
 
-        if hasError, !shouldReturnFailedEmptyNumbers {
-            multiParseArray = multiParseArray.filter { $0.type != .notParsed }
+        if hasError && !shouldReturnFailedEmptyNumbers {
+            results = results.filter { $0.type != .notParsed }
         }
 
-        return multiParseArray
+        return results
     }
 
     /// Get correct ISO 3166 compliant region code for a number.
